@@ -1,0 +1,78 @@
+name: Compilar TWRP A14 5G
+
+on:
+  workflow_dispatch: # Permite que você ative a compilação manualmente com um clique
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Maximizar Espaço no Disco da Nuvem
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 1024
+        swap-size-mb: 10240
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+
+    - name: Configurar Ferramentas de Compilação
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gperf gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf lib32ncurses5-dev lib32z1-dev liblz4-tool libncurses5 libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
+
+    - name: Instalar a ferramenta Repo do Android
+      run: |
+        mkdir ~/bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+        chmod a+x ~/bin/repo
+        sudo ln -sf ~/bin/repo /usr/bin/repo
+
+    - name: Inicializar os Códigos do TWRP (Manifest)
+      run: |
+        mkdir twrp
+        cd twrp
+        git config --global user.name "Usuario"
+        git config --global user.email "usuario@email.com"
+        repo init --depth=1 -u https://github.com/Minimal-TWRP-Search/platform_manifest_twrp_aosp.git -b twrp-12.1
+        repo sync -c -j$(nproc) --force-sync --no-clone-bundle --no-tags
+
+    - name: Baixar as Árvores de Código do Seu Celular
+      run: |
+        cd twrp
+        # Clona a pasta a14x oficial do TeamWin
+        git clone https://github.com/TeamWin/android_device_samsung_a14x.git -b twrp-12.1 device/samsung/a14x
+        # Clona a pasta s5e8535-common oficial do TeamWin
+        git clone https://github.com/TeamWin/android_device_samsung_s5e8535-common.git -b twrp-12.1 device/samsung/s5e8535-common
+
+    - name: Aplicar as Modificações para Corrigir a Criptografia (Nossas Alterações)
+      run: |
+        cd twrp
+        
+        # 1. Atualiza o BoardConfig.mk com os comandos modernos de criptografia que arrumamos
+        cat <<EOT >> device/samsung/a14x/BoardConfig.mk
+        # Correções para criptografia moderna da Samsung
+        TW_INCLUDE_CRYPTO := true
+        TW_INCLUDE_CRYPTO_FBE := true
+        BOARD_USES_METADATA_ENCRYPTION := true
+        TW_USE_FSCRYPT_POLICY := 1
+        PLATFORM_VERSION := 14
+        PLATFORM_VERSION_LAST_STABLE := 14
+        EOT
+
+        # 2. Corrige a linha do /data no arquivo recovery.fstab adicionando wrappedkey_v0
+        sed -i 's|/dev/block/by-name/userdata.*|/dev/block/by-name/userdata\t/data\tf2fs\tnoatime,nosuid,nodev,discard,usrquota,grpquota,fsync_mode=nobarrier,reserve_root=32768,resgid=5678\twait,encryptable=footer,length=-20480,fileencryption=aes-256-xts:wrappedkey_v0,metadata_encryption=aes-256-xts,keydirectory=/metadata/vold/metadata_encryption,fscompress|' device/samsung/s5e8535-common/recovery/root/system/etc/recovery.fstab
+
+    - name: Iniciar a Compilação do TWRP
+      run: |
+        cd twrp
+        export ALLOW_MISSING_DEPENDENCIES=true
+        source build/envsetup.sh
+        lunch twrp_a14x-eng
+        make recoveryimage -j$(nproc)
+
+    - name: Fazer Upload do arquivo final (.IMG corrigido)
+      uses: actions/upload-artifact@v4
+      with:
+        name: TWRP-A14_5G-Corrigido
+        path: twrp/out/target/product/a14x/recovery.img
