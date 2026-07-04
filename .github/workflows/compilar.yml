@@ -30,13 +30,15 @@ jobs:
 
     - name: Inicializar os Códigos do TWRP (Manifest)
       run: |
+        git config --global user.name "samuuul12"
+        git config --global user.email "samuuul12@users.noreply.github.com"
+        git config --global color.ui false
         mkdir twrp
         cd twrp
-        git config --global user.name "Usuario"
-        git config --global user.email "usuario@email.com"
-        # Usando o manifesto oficial mantido pela comunidade do TWRP
-        repo init --depth=1 -u https://github.com/minimal-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1
+        # Usando o manifesto oficial principal do TeamWin para evitar erros de autenticação interativa
+        repo init --depth=1 -u https://github.com/TeamWin/android_platform_manifest_twrp_aosp.git -b twrp-12.1
         repo sync -c -j$(nproc) --force-sync --no-clone-bundle --no-tags
+    
     
     - name: Baixar as Árvores de Código do Seu Celular
       run: |
