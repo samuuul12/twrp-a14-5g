@@ -34,9 +34,10 @@ jobs:
         cd twrp
         git config --global user.name "Usuario"
         git config --global user.email "usuario@email.com"
-        repo init --depth=1 -u https://github.com/Minimal-TWRP-Search/platform_manifest_twrp_aosp.git -b twrp-12.1
+        # Usando o manifesto oficial mantido pela comunidade do TWRP
+        repo init --depth=1 -u https://github.com/minimal-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1
         repo sync -c -j$(nproc) --force-sync --no-clone-bundle --no-tags
-
+    
     - name: Baixar as Árvores de Código do Seu Celular
       run: |
         cd twrp
